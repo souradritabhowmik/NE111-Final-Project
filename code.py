@@ -1,19 +1,27 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
 import scipy.stats as stats
 from io import StringIO
 import warnings
-
 warnings.filterwarnings('ignore')
 
+# Try to import matplotlib, but provide fallback
+try:
+    import matplotlib.pyplot as plt
+    MATPLOTLIB_AVAILABLE = True
+except ImportError:
+    MATPLOTLIB_AVAILABLE = False
+    st.warning("⚠️ matplotlib is not installed. Using Streamlit's native charts instead.")
+
+# Configure the page
 st.set_page_config(
     page_title="Distribution Fitting Tool",
-    page_icon="✧",
+    page_icon="📊",
     layout="wide"
 )
 
+# Custom CSS for better styling
 st.markdown("""
 <style>
     .main-header {
@@ -39,7 +47,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Title and description
-st.markdown('<div class="main-header"> ✧ Distribution Fitting Tool ✧ </div>', unsafe_allow_html=True)
+st.markdown('<div class="main-header">📊 Distribution Fitting Tool</div>', unsafe_allow_html=True)
 st.write("Upload your data or enter it manually to fit various statistical distributions and visualize the results.")
 
 # Available distributions with their scipy.stats names and parameters
@@ -131,8 +139,57 @@ def manual_fit_distribution(data, dist_name, manual_params):
         st.error(f"Error with manual fit: {str(e)}")
         return None
 
+def create_matplotlib_plot(data, results, title):
+    """Create plot using matplotlib"""
+    if not MATPLOTLIB_AVAILABLE:
+        return None
+        
+    fig, ax = plt.subplots(figsize=(10, 6))
+    
+    # Plot histogram of data
+    hist, bins, _ = ax.hist(data, bins='auto', density=True, alpha=0.7, 
+                           color='lightblue', edgecolor='black', label='Data')
+    
+    # Plot fitted distributions
+    x = np.linspace(np.min(data), np.max(data), 1000)
+    for dist_name, result in results.items():
+        pdf_values = result['fitted_dist'].pdf(x)
+        ax.plot(x, pdf_values, linewidth=2, label=f'{dist_name}')
+    
+    ax.set_xlabel('Value')
+    ax.set_ylabel('Probability Density')
+    ax.set_title(title)
+    ax.legend()
+    ax.grid(True, alpha=0.3)
+    
+    return fig
+
+def create_streamlit_plot(data, results, title):
+    """Create plot using Streamlit's native charting"""
+    # Create histogram data
+    hist, bin_edges = np.histogram(data, bins='auto', density=True)
+    bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
+    
+    # Create chart data
+    chart_data = pd.DataFrame({
+        'value': bin_centers,
+        'data_histogram': hist
+    })
+    
+    # Add fitted distributions
+    x = np.linspace(np.min(data), np.max(data), 1000)
+    for dist_name, result in results.items():
+        pdf_values = result['fitted_dist'].pdf(x)
+        chart_data[f'{dist_name}_fit'] = np.interp(bin_centers, x, pdf_values)
+    
+    # Create line chart
+    st.line_chart(
+        chart_data.set_index('value'),
+        use_container_width=True
+    )
+
 # Main layout with tabs
-tab1, tab2, tab3 = st.tabs(["Data Input", "Auto Fitting", "Manual Fitting"])
+tab1, tab2, tab3 = st.tabs(["📥 Data Input", "🔧 Auto Fitting", "🎛️ Manual Fitting"])
 
 with tab1:
     st.markdown('<div class="section-header">Data Input Methods</div>', unsafe_allow_html=True)
@@ -152,10 +209,10 @@ with tab1:
                 # Clean and parse manual data
                 data_str = manual_data.replace(',', ' ').split()
                 data = np.array([float(x) for x in data_str])
-                st.success(f" Successfull {len(data)} data points")
+                st.success(f"✅ Successfully loaded {len(data)} data points")
                 st.session_state.data = data
             except ValueError:
-                st.error(" Please enter valid numerical data  ")
+                st.error("❌ Please enter valid numerical data")
     
     with col2:
         st.subheader("CSV File Upload")
@@ -173,12 +230,12 @@ with tab1:
                     selected_column = st.selectbox("Select column for analysis:", df.columns)
                     data = df[selected_column].dropna().values
                     st.session_state.data = data
-                    st.success(f" Successfully loaded {len(data)} data points from column '{selected_column}'")
+                    st.success(f"✅ Successfully loaded {len(data)} data points from column '{selected_column}'")
                 else:
-                    st.error(" No valid columns found in the CSV file")
+                    st.error("❌ No valid columns found in the CSV file")
                     
             except Exception as e:
-                st.error(f" Error reading CSV file: {str(e)}")
+                st.error(f"❌ Error reading CSV file: {str(e)}")
 
 # Check if data is available
 if 'data' not in st.session_state:
@@ -188,7 +245,7 @@ if 'data' not in st.session_state:
 data = st.session_state.data
 
 # Display data summary
-with st.expander("Data Summary"):
+with st.expander("📋 Data Summary"):
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.metric("Data Points", len(data))
@@ -209,7 +266,7 @@ with tab2:
         default=["Normal", "Gamma", "Weibull"]
     )
     
-    if st.button(" Fit Selected Distributions") and selected_dists:
+    if st.button("🚀 Fit Selected Distributions") and selected_dists:
         results = {}
         
         # Fit all selected distributions
@@ -223,32 +280,23 @@ with tab2:
         st.session_state.fitting_results = results
         
         if results:
-            st.markdown('<div class="success-box"> All distributions fitted successfully </div>', unsafe_allow_html=True)
+            st.markdown('<div class="success-box">✅ All distributions fitted successfully!</div>', unsafe_allow_html=True)
             
             # Display results in columns
             col1, col2 = st.columns(2)
             
             with col1:
                 st.subheader("📈 Visualization")
-                fig, ax = plt.subplots(figsize=(10, 6))
                 
-                # Plot histogram of data
-                hist, bins, _ = ax.hist(data, bins='auto', density=True, alpha=0.7, 
-                                       color='lightblue', edgecolor='black', label='Data')
-                
-                # Plot fitted distributions
-                x = np.linspace(np.min(data), np.max(data), 1000)
-                for dist_name, result in results.items():
-                    pdf_values = result['fitted_dist'].pdf(x)
-                    ax.plot(x, pdf_values, linewidth=2, label=f'{dist_name}')
-                
-                ax.set_xlabel('Value')
-                ax.set_ylabel('Probability Density')
-                ax.set_title('Distribution Fitting Results')
-                ax.legend()
-                ax.grid(True, alpha=0.3)
-                
-                st.pyplot(fig)
+                if MATPLOTLIB_AVAILABLE:
+                    # Use matplotlib for detailed plots
+                    fig = create_matplotlib_plot(data, results, 'Distribution Fitting Results')
+                    if fig:
+                        st.pyplot(fig)
+                else:
+                    # Use Streamlit's native charting as fallback
+                    st.info("Using Streamlit native charts (install matplotlib for better visualization)")
+                    create_streamlit_plot(data, results, 'Distribution Fitting Results')
             
             with col2:
                 st.subheader("📊 Fit Quality Metrics")
@@ -332,23 +380,46 @@ with tab3:
                 
                 with col1:
                     st.subheader("📊 Manual Fit Visualization")
-                    fig, ax = plt.subplots(figsize=(10, 6))
                     
-                    # Plot histogram and manual fit
-                    hist, bins, _ = ax.hist(data, bins='auto', density=True, alpha=0.7, 
-                                           color='lightgreen', edgecolor='black', label='Data')
-                    
-                    x = np.linspace(np.min(data), np.max(data), 1000)
-                    pdf_values = result['fitted_dist'].pdf(x)
-                    ax.plot(x, pdf_values, linewidth=2, color='red', label=f'Manual {manual_dist}')
-                    
-                    ax.set_xlabel('Value')
-                    ax.set_ylabel('Probability Density')
-                    ax.set_title(f'Manual {manual_dist} Fit')
-                    ax.legend()
-                    ax.grid(True, alpha=0.3)
-                    
-                    st.pyplot(fig)
+                    if MATPLOTLIB_AVAILABLE:
+                        # Create manual fit plot with matplotlib
+                        fig, ax = plt.subplots(figsize=(10, 6))
+                        
+                        # Plot histogram and manual fit
+                        hist, bins, _ = ax.hist(data, bins='auto', density=True, alpha=0.7, 
+                                               color='lightgreen', edgecolor='black', label='Data')
+                        
+                        x = np.linspace(np.min(data), np.max(data), 1000)
+                        pdf_values = result['fitted_dist'].pdf(x)
+                        ax.plot(x, pdf_values, linewidth=2, color='red', label=f'Manual {manual_dist}')
+                        
+                        ax.set_xlabel('Value')
+                        ax.set_ylabel('Probability Density')
+                        ax.set_title(f'Manual {manual_dist} Fit')
+                        ax.legend()
+                        ax.grid(True, alpha=0.3)
+                        
+                        st.pyplot(fig)
+                    else:
+                        # Use Streamlit native charting
+                        st.info("Using Streamlit native charts")
+                        hist, bin_edges = np.histogram(data, bins='auto', density=True)
+                        bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
+                        
+                        x = np.linspace(np.min(data), np.max(data), 1000)
+                        pdf_values = result['fitted_dist'].pdf(x)
+                        
+                        # Create comparison data
+                        chart_data = pd.DataFrame({
+                            'value': bin_centers,
+                            'data_histogram': hist,
+                            f'manual_{manual_dist}': np.interp(bin_centers, x, pdf_values)
+                        })
+                        
+                        st.line_chart(
+                            chart_data.set_index('value'),
+                            use_container_width=True
+                        )
                 
                 with col2:
                     st.subheader("📈 Fit Quality")
@@ -361,11 +432,23 @@ with tab3:
                     with metrics_col3:
                         st.metric("KL Divergence", f"{result['kl_divergence']:.4f}")
                     
-                    st.subheader(" Current Parameters ")
+                    st.subheader("🔢 Current Parameters")
                     for i, (name, value) in enumerate(zip(param_names, manual_params)):
                         st.write(f"{name}: {value:.4f}")
 
 # Footer
 st.markdown("---")
 st.markdown(
+    "**Distribution Fitting Tool** | Created with Streamlit and SciPy | "
+    "For educational and statistical analysis purposes"
 )
+
+# Installation instructions in sidebar
+with st.sidebar:
+    st.markdown("### Installation Help")
+    st.markdown("""
+    If you see import errors, install required packages:
+    
+    ```bash
+    pip install streamlit pandas numpy scipy matplotlib
+    ```
