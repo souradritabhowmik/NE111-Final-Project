@@ -2,7 +2,4 @@ streamlit
 pandas
 numpy
 scipy
-matplotlib
-
-pip install -r requirements.txt
 
