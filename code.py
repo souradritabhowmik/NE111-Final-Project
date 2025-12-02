@@ -6,14 +6,12 @@ from io import StringIO
 import warnings
 warnings.filterwarnings('ignore')
 
-# Configure the page
 st.set_page_config(
-    page_title="Distribution Fitting Tool",
-    page_icon="📊",
+    page_title="Graph Fitting",
+    page_icon=".",
     layout="wide"
 )
 
-# Custom CSS for better styling
 st.markdown("""
 <style>
     .main-header {
@@ -38,11 +36,9 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Title and description
 st.markdown('<div class="main-header">📊 Distribution Fitting Tool</div>', unsafe_allow_html=True)
 st.write("Upload your data or enter it manually to fit various statistical distributions and visualize the results.")
 
-# Available distributions with their scipy.stats names and parameters
 DISTRIBUTIONS = {
     "Normal": {"func": stats.norm, "params": ["μ (mean)", "σ (std)"]},
     "Gamma": {"func": stats.gamma, "params": ["α (shape)", "β (scale)", "loc"]},
@@ -64,28 +60,22 @@ def fit_distribution(data, dist_name):
         dist_info = DISTRIBUTIONS[dist_name]
         dist_func = dist_info["func"]
         
-        # Fit distribution to data
         params = dist_func.fit(data)
         
-        # Create frozen distribution
         fitted_dist = dist_func(*params)
         
-        # Calculate fit metrics
         hist, bin_edges = np.histogram(data, bins='auto', density=True)
         bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
         pdf_values = fitted_dist.pdf(bin_centers)
         
-        # Remove zeros to avoid log issues
         mask = (pdf_values > 0) & (hist > 0)
         if np.sum(mask) > 0:
             kl_divergence = stats.entropy(hist[mask], pdf_values[mask])
         else:
             kl_divergence = float('inf')
             
-        # Mean squared error
         mse = np.mean((hist - pdf_values) ** 2)
         
-        # Maximum error
         max_error = np.max(np.abs(hist - pdf_values))
         
         return {
@@ -106,7 +96,6 @@ def manual_fit_distribution(data, dist_name, manual_params):
         dist_func = dist_info["func"]
         fitted_dist = dist_func(*manual_params)
         
-        # Calculate fit metrics
         hist, bin_edges = np.histogram(data, bins='auto', density=True)
         bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
         pdf_values = fitted_dist.pdf(bin_centers)
@@ -133,24 +122,20 @@ def manual_fit_distribution(data, dist_name, manual_params):
 
 def create_streamlit_plot(data, results, title):
     """Create plot using Streamlit's native charting"""
-    # Create histogram data
     hist, bin_edges = np.histogram(data, bins='auto', density=True)
     bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
     
-    # Create chart data
     chart_data = pd.DataFrame({
         'value': bin_centers,
         'data_histogram': hist
     })
     
-    # Add fitted distributions
     x = np.linspace(np.min(data), np.max(data), 1000)
     for dist_name, result in results.items():
         pdf_values = result['fitted_dist'].pdf(x)
         # Interpolate to match histogram bins
         chart_data[f'{dist_name}_fit'] = np.interp(bin_centers, x, pdf_values)
     
-    # Create line chart
     st.line_chart(
         chart_data.set_index('value'),
         use_container_width=True
@@ -158,15 +143,12 @@ def create_streamlit_plot(data, results, title):
 
 def create_manual_fit_plot(data, result, dist_name):
     """Create manual fit plot using Streamlit native charts"""
-    # Create histogram data
     hist, bin_edges = np.histogram(data, bins='auto', density=True)
     bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
     
-    # Create fitted curve
     x = np.linspace(np.min(data), np.max(data), 1000)
     pdf_values = result['fitted_dist'].pdf(x)
     
-    # Create comparison data
     chart_data = pd.DataFrame({
         'value': bin_centers,
         'data_histogram': hist,
@@ -178,8 +160,7 @@ def create_manual_fit_plot(data, result, dist_name):
         use_container_width=True
     )
 
-# Main layout with tabs
-tab1, tab2, tab3 = st.tabs(["📥 Data Input", "🔧 Auto Fitting", "🎛️ Manual Fitting"])
+tab1, tab2, tab3 = st.tabs(["Input", "Auto Fitting", "Manual Fitting"])
 
 with tab1:
     st.markdown('<div class="section-header">Data Input Methods</div>', unsafe_allow_html=True)
@@ -187,7 +168,7 @@ with tab1:
     col1, col2 = st.columns(2)
     
     with col1:
-        st.subheader("Manual Data Entry")
+        st.subheader("Manual Entry")
         manual_data = st.text_area(
             "Enter data (comma or space separated):",
             value="2.3, 3.1, 4.5, 2.8, 3.9, 4.2, 3.7, 2.9, 3.4, 4.1, 3.2, 4.7",
@@ -196,7 +177,6 @@ with tab1:
         
         if manual_data:
             try:
-                # Clean and parse manual data
                 data_str = manual_data.replace(',', ' ').split()
                 data = np.array([float(x) for x in data_str])
                 st.success(f"✅ Successfully loaded {len(data)} data points")
@@ -210,12 +190,10 @@ with tab1:
         
         if uploaded_file is not None:
             try:
-                # Read CSV file
                 df = pd.read_csv(uploaded_file)
                 st.write("Preview of uploaded data:")
                 st.dataframe(df.head())
                 
-                # Let user select column
                 if len(df.columns) > 0:
                     selected_column = st.selectbox("Select column for analysis:", df.columns)
                     data = df[selected_column].dropna().values
@@ -227,14 +205,12 @@ with tab1:
             except Exception as e:
                 st.error(f"❌ Error reading CSV file: {str(e)}")
 
-# Check if data is available
 if 'data' not in st.session_state:
-    st.info("👆 Please enter or upload data in the 'Data Input' tab to get started")
+    st.info("Please enter or upload data in the 'Data Input' tab to get started")
     st.stop()
 
 data = st.session_state.data
 
-# Display data summary
 with st.expander("📋 Data Summary"):
     col1, col2, col3, col4 = st.columns(4)
     with col1:
@@ -249,17 +225,15 @@ with st.expander("📋 Data Summary"):
 with tab2:
     st.markdown('<div class="section-header">Automatic Distribution Fitting</div>', unsafe_allow_html=True)
     
-    # Distribution selection
     selected_dists = st.multiselect(
         "Select distributions to fit:",
         list(DISTRIBUTIONS.keys()),
         default=["Normal", "Gamma", "Weibull"]
     )
     
-    if st.button("🚀 Fit Selected Distributions") and selected_dists:
+    if st.button(" Fit Selected Distributions") and selected_dists:
         results = {}
         
-        # Fit all selected distributions
         progress_bar = st.progress(0)
         for i, dist_name in enumerate(selected_dists):
             progress_bar.progress((i + 1) / len(selected_dists), text=f"Fitting {dist_name}...")
@@ -272,7 +246,6 @@ with tab2:
         if results:
             st.markdown('<div class="success-box">✅ All distributions fitted successfully!</div>', unsafe_allow_html=True)
             
-            # Display results in columns
             col1, col2 = st.columns(2)
             
             with col1:
@@ -283,7 +256,6 @@ with tab2:
             with col2:
                 st.subheader("📊 Fit Quality Metrics")
                 
-                # Create metrics dataframe
                 metrics_data = []
                 for dist_name, result in results.items():
                     metrics_data.append({
@@ -296,10 +268,9 @@ with tab2:
                 metrics_df = pd.DataFrame(metrics_data)
                 st.dataframe(metrics_df, use_container_width=True)
                 
-                # Best fit based on MSE
                 if metrics_data:
                     best_fit = min(metrics_data, key=lambda x: float(x['MSE']))
-                    st.info(f"🏆 **Best Fit**: {best_fit['Distribution']} (MSE: {best_fit['MSE']})")
+                    st.info(f" **Best Fit**: {best_fit['Distribution']} (MSE: {best_fit['MSE']})")
                 
                 st.subheader("🔢 Fitted Parameters")
                 for dist_name, result in results.items():
@@ -307,11 +278,9 @@ with tab2:
                         param_names = DISTRIBUTIONS[dist_name]["params"]
                         params = result['params']
                         
-                        # Handle cases where we have more parameters than names
                         for i, (name, value) in enumerate(zip(param_names, params)):
                             st.write(f"{name}: {value:.4f}")
                         
-                        # If there are more parameters than names, show them as well
                         if len(params) > len(param_names):
                             for i in range(len(param_names), len(params)):
                                 st.write(f"Parameter {i+1}: {params[i]:.4f}")
@@ -327,13 +296,11 @@ with tab3:
         
         st.write("Adjust the parameters using the sliders below:")
         
-        # Create sliders for each parameter
         manual_params = []
         cols = st.columns(len(param_names))
         
         for i, param_name in enumerate(param_names):
             with cols[i]:
-                # Determine reasonable slider range based on data
                 data_mean = np.mean(data)
                 data_std = np.std(data)
                 
@@ -348,20 +315,19 @@ with tab3:
                 
                 manual_params.append(value)
         
-        # Add additional parameters if needed (some distributions have fixed number of parameters)
         if manual_dist == "Gamma" and len(manual_params) < 3:
             manual_params.extend([0.0])  # Add loc parameter
         elif manual_dist == "Weibull" and len(manual_params) < 3:
             manual_params.extend([0.0])  # Add loc parameter
         
-        if st.button("🔍 Evaluate Manual Fit"):
+        if st.button("Evaluate Manual Fit"):
             result = manual_fit_distribution(data, manual_dist, manual_params)
             
             if result:
                 col1, col2 = st.columns(2)
                 
                 with col1:
-                    st.subheader("📊 Manual Fit Visualization")
+                    st.subheader(" Manual Fit Visualization")
                     create_manual_fit_plot(data, result, manual_dist)
                     st.caption(f"Manual {manual_dist} distribution fit to your data")
                 
@@ -376,13 +342,9 @@ with tab3:
                     with metrics_col3:
                         st.metric("KL Divergence", f"{result['kl_divergence']:.4f}")
                     
-                    st.subheader("🔢 Current Parameters")
+                    st.subheader(" Parameters")
                     for i, (name, value) in enumerate(zip(param_names, manual_params)):
                         st.write(f"{name}: {value:.4f}")
 
-# Footer
 st.markdown("---")
-st.markdown(
-    "**Distribution Fitting Tool** | Created with Streamlit and SciPy | "
-    "For educational and statistical analysis purposes"
-)
+st.markdown()
