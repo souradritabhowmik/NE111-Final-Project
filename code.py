@@ -4,7 +4,6 @@ import numpy as np
 import scipy.stats as stats
 from io import StringIO
 import warnings
-import matplotlib.pyplot as plt
 
 warnings.filterwarnings('ignore')
 
